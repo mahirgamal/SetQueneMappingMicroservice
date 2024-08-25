@@ -1,28 +1,39 @@
 package com.function;
 
 public class QueueMappingRequest {
-    private String event;
+    private long publisherId;
+    private String consumerQueueName;
+    private String eventType;
 
-    private String queue;
-
-    // Constructors, getters, and setters
-    public QueueMappingRequest() {
+    // Getters and setters
+    public long getPublisherId() {
+        return publisherId;
     }
 
-    public String getEvent() {
-        return event;
+    public void setPublisherId(long publisherId) {
+        this.publisherId = publisherId;
     }
 
-    public void setEvent(String event) {
-        this.event = event;
+    public String getConsumerQueueName() {
+        return consumerQueueName;
     }
 
-    public String getQueue() {
-        return queue;
+    public void setConsumerQueueName(String consumerQueueName) {
+        this.consumerQueueName = consumerQueueName;
     }
 
-    public void setQueue(String queue) {
-        this.queue = queue;
+    public String getEventType() {
+        return eventType;
     }
 
+    public void setEventType(String eventType) {
+        this.eventType = eventType;
+    }
+
+    // Validation method
+    public boolean isValid() {
+        return consumerQueueName != null && !consumerQueueName.isEmpty() && 
+               eventType != null && !eventType.isEmpty() && 
+               publisherId > 0;
+    }
 }

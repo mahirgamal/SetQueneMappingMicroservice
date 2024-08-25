@@ -1,52 +1,45 @@
 package com.function;
 
+import com.domain.SetQueueMapping;
 import com.domain.Authorisation;
-import com.microsoft.azure.functions.ExecutionContext;
+import com.microsoft.azure.functions.annotation.AuthorizationLevel;
+import com.microsoft.azure.functions.annotation.FunctionName;
+import com.microsoft.azure.functions.annotation.HttpTrigger;
 import com.microsoft.azure.functions.HttpMethod;
 import com.microsoft.azure.functions.HttpRequestMessage;
 import com.microsoft.azure.functions.HttpResponseMessage;
 import com.microsoft.azure.functions.HttpStatus;
-import com.microsoft.azure.functions.annotation.AuthorizationLevel;
-import com.microsoft.azure.functions.annotation.FunctionName;
-import com.microsoft.azure.functions.annotation.HttpTrigger;
+import com.microsoft.azure.functions.ExecutionContext;
 
-import java.util.List;
-import java.util.logging.Logger;
+import java.util.Optional;
 
-/**
- * Azure Functions with HTTP Trigger.
- */
 public class Function {
-    private static final Logger logger = Logger.getLogger(Function.class.getName());
 
-    /**
-     * This function listens at endpoint "/api/HttpExample". Two ways to invoke it using "curl" command in bash:
-     * 1. curl -d "HTTP Body" {your host}/api/HttpExample
-     * 2. curl "{your host}/api/HttpExample?name=HTTP%20Query"
-     */
+    private final SetQueueMapping setQueueMapping;
+    private final Authorisation authorisation;
+
+    public Function() {
+        this.setQueueMapping = new SetQueueMapping();
+        this.authorisation = new Authorisation();
+    }
+
     @FunctionName("setQueueMapping")
-    public HttpResponseMessage run(
-            @HttpTrigger(
-                name = "req",
-                methods = {HttpMethod.POST},
-                authLevel = AuthorizationLevel.ANONYMOUS)
-                HttpRequestMessage<List<QueueMappingRequest>> request,
-            final ExecutionContext context) {
-        context.getLogger().info("Java HTTP trigger processed a request.");
-
-        final List<QueueMappingRequest> queueMappingRequests = request.getBody();
-
-        if (queueMappingRequests == null || queueMappingRequests.isEmpty()) {
-            return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
-                    .body("Please pass JSON array in the request body").build();
-        }
+    public HttpResponseMessage setQueueMapping(
+            @HttpTrigger(name = "req", methods = {HttpMethod.POST}, authLevel = AuthorizationLevel.FUNCTION) HttpRequestMessage<Optional<QueueMappingRequest>> request,
+            ExecutionContext context) {
         
-        Authorisation auth=new Authorisation();
-        if (auth.isAuthorised(request)) {
-            return request.createResponseBuilder(HttpStatus.UNAUTHORIZED).body("Unauthorized").build();
-        } else {
-            logger.warning("Authorization failed or user information exists for user");
-            return request.createResponseBuilder(HttpStatus.UNAUTHORIZED).body("Unauthorized").build();
+        QueueMappingRequest mappingRequest = request.getBody().orElse(null);
+        if (mappingRequest == null || !mappingRequest.isValid()) {
+            return request.createResponseBuilder(HttpStatus.BAD_REQUEST).body("Invalid request data").build();
         }
+
+        long userId = mappingRequest.getPublisherId();
+        if (!authorisation.isUserAuthorised(userId)) {
+            return request.createResponseBuilder(HttpStatus.UNAUTHORIZED).body("User not authorised").build();
+        }
+
+        boolean success = setQueueMapping.setMapping(userId, mappingRequest.getConsumerQueueName(), mappingRequest.getEventType());
+        return success ? request.createResponseBuilder(HttpStatus.OK).body("Mapping set successfully").build() 
+                       : request.createResponseBuilder(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to set mapping").build();
     }
 }
